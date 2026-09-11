@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Control ESPolero</title>
+<script src="https://cdn.jsdelivr.net/npm/nipplejs@0.10.1/dist/nipplejs.min.js"></script>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    font-family: -apple-system, system-ui, sans-serif;
+    background: #0f1420; color: #eee; user-select: none;
+  }
+  .barra {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px; background: #1a2030;
+  }
+  .titulo { font-weight: 700; font-size: 18px; }
+  .estado { font-size: 13px; padding: 4px 10px; border-radius: 12px; background: #444; }
+  .estado.ok  { background: #2d7a3f; }
+  .estado.err { background: #a83232; }
+  button {
+    background: #3b82f6; color: white; border: 0;
+    padding: 10px 16px; border-radius: 8px; font-weight: 600; font-size: 14px;
+  }
+  button:active { background: #2563eb; }
+  .stage {
+    position: relative; height: calc(100vh - 60px);
+    display: grid; grid-template-columns: 1fr 1fr;
+  }
+  .zona {
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .zona.izq { background: radial-gradient(circle at center, #1e2a44 0%, #0f1420 70%); }
+  .zona.der { background: radial-gradient(circle at center, #2a1e44 0%, #0f1420 70%); }
+  .etiqueta {
+    position: absolute; top: 10px; font-size: 12px; opacity: 0.6; letter-spacing: 1px;
+  }
+  .lectura {
+    position: absolute; bottom: 10px; font-size: 12px; opacity: 0.7;
+    font-family: monospace;
+  }
+</style>
+</head>
+<body>
+
+<div class="barra">
+  <div class="titulo">🤖 ESPolero</div>
+  <div id="estado" class="estado">Desconectado</div>
+  <button id="btnConectar">Conectar</button>
+</div>
+
+<div class="stage">
+  <div class="zona izq" id="zonaIzq">
+    <div class="etiqueta">VELOCIDAD</div>
+    <div class="lectura" id="lecturaVel">vel: 0</div>
+  </div>
+  <div class="zona der" id="zonaDer">
+    <div class="etiqueta">GIRO</div>
+    <div class="lectura" id="lecturaGiro">giro: 0</div>
+  </div>
+</div>
+
+<script>
+  // ===== Configuracion BLE (debe coincidir con el .ino) =====
+  const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
+  const CHAR_UUID    = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+
+  let caracteristica = null;
+  let velocidad = 0;   // -100 a +100
+  let giro      = 0;   // -100 a +100
+
+  const $estado    = document.getElementById('estado');
+  const $btn       = document.getElementById('btnConectar');
+  const $lectVel   = document.getElementById('lecturaVel');
+  const $lectGiro  = document.getElementById('lecturaGiro');
+
+  // ===== Joysticks (nipple.js) =====
+  const opciones = {
+    mode: 'static',
+    position: { left: '50%', top: '50%' },
+    color: 'white',
+    size: 160,
+    restOpacity: 0.7,
+  };
+
+  const joyIzq = nipplejs.create({ zone: document.getElementById('zonaIzq'), ...opciones });
+  const joyDer = nipplejs.create({ zone: document.getElementById('zonaDer'), ...opciones });
+
+  // Joystick izquierdo: velocidad (eje Y). Arriba = adelante.
+  joyIzq.on('move', (evt, data) => {
+    // data.vector.y va de -1 (abajo) a +1 (arriba)
+    velocidad = Math.round(data.vector.y * 100);
+    $lectVel.textContent = 'vel: ' + velocidad;
+  });
+  joyIzq.on('end', () => {
+    velocidad = 0;
+    $lectVel.textContent = 'vel: 0';
+  });
+
+  // Joystick derecho: giro (eje X). Derecha = girar a la derecha.
+  joyDer.on('move', (evt, data) => {
+    giro = Math.round(data.vector.x * 100);
+    $lectGiro.textContent = 'giro: ' + giro;
+  });
+  joyDer.on('end', () => {
+    giro = 0;
+    $lectGiro.textContent = 'giro: 0';
+  });
+
+  // ===== Conexion BLE =====
+  $btn.addEventListener('click', async () => {
+    if (!navigator.bluetooth) {
+      alert('Este navegador no soporta Web Bluetooth. Usa Chrome en Android.');
+      return;
+    }
+    try {
+      $estado.textContent = 'Buscando...';
+      $estado.className = 'estado';
+
+      const device = await navigator.bluetooth.requestDevice({
+        filters: [{ namePrefix: 'ESPolero' }],
+        optionalServices: [SERVICE_UUID],
+      });
+
+      device.addEventListener('gattserverdisconnected', () => {
+        $estado.textContent = 'Desconectado';
+        $estado.className = 'estado err';
+        caracteristica = null;
+      });
+
+      const server  = await device.gatt.connect();
+      const service = await server.getPrimaryService(SERVICE_UUID);
+      caracteristica = await service.getCharacteristic(CHAR_UUID);
+
+      $estado.textContent = 'Conectado: ' + device.name;
+      $estado.className = 'estado ok';
+    } catch (err) {
+      console.error(err);
+      $estado.textContent = 'Error: ' + err.message;
+      $estado.className = 'estado err';
+    }
+  });
+
+  // ===== Envio periodico de comandos (20 Hz) =====
+  setInterval(async () => {
+    if (!caracteristica) return;
+    try {
+      // Two signed bytes: velocidad y giro
+      const buf = new Int8Array([velocidad, giro]);
+      await caracteristica.writeValueWithoutResponse(buf);
+    } catch (err) {
+      // Ignorar errores puntuales de escritura
+    }
+  }, 50);
+</script>
+</body>
+</html>
