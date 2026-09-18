@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Control ESPolero - Rápido y Furioso</title>
+<script src="https://cdn.jsdelivr.net/npm/nipplejs@0.10.1/dist/nipplejs.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Impact&display=swap');
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  
+  html, body {
+    margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden;
+    font-family: 'Orbitron', sans-serif;
+    background: #050505; color: #fff; user-select: none;
+  }
+
+  /* Fondo de Toretto con estilo Nitro */
+  .fondo-toretto {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: 
+      linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(20,0,0,0.6) 50%, rgba(0,0,0,0.9) 100%),
+      url('https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?q=80&w=1200&auto=format&fit=crop') center/cover no-repeat;
+    z-index: 0;
+  }
+
+  /* Texto de fondo: TUVE FE */
+  .texto-tuve-fe {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Impact', sans-serif;
+    font-size: clamp(3rem, 12vw, 8rem);
+    color: rgba(255, 30, 30, 0.25);
+    text-shadow: 0 0 30px rgba(255, 0, 0, 0.6);
+    white-space: nowrap;
+    letter-spacing: 6px;
+    z-index: 1;
+    pointer-events: none;
+    text-align: center;
+  }
+
+  .subtexto-toretto {
+    display: block;
+    font-size: 0.35em;
+    color: rgba(255, 255, 255, 0.4);
+    letter-spacing: 4px;
+  }
+
+  /* Barra Superior */
+  .barra {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 16px; 
+    background: rgba(15, 15, 20, 0.9);
+    backdrop-filter: blur(10px);
+    height: 60px;
+    border-bottom: 2px solid #ff1e1e;
+    box-shadow: 0 4px 15px rgba(255, 0, 0, 0.3);
+    position: relative;
+    z-index: 10;
+  }
+
+  .titulo { 
+    font-weight: 900; 
+    font-size: 16px; 
+    color: #fff;
+    text-shadow: 0 0 10px #ff1e1e;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .acciones-barra { display: flex; align-items: center; gap: 8px; }
+
+  .estado { 
+    font-size: 11px; font-weight: 700;
+    padding: 4px 10px; border-radius: 12px; 
+    background: rgba(255,255,255,0.1); 
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+  .estado.ok  { background: rgba(16, 185, 129, 0.3); border-color: #10b981; color: #34d399; }
+  .estado.err { background: rgba(239, 68, 68, 0.3); border-color: #ef4444; color: #fca5a5; }
+
+  button {
+    background: linear-gradient(135deg, #ff1e1e, #990000);
+    color: white; border: 0;
+    padding: 8px 14px; border-radius: 6px; font-weight: 700; font-size: 12px;
+    cursor: pointer;
+    font-family: 'Orbitron', sans-serif;
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.4);
+  }
+  button:active { transform: scale(0.95); }
+
+  .btn-fullscreen {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: none;
+  }
+
+  /* Escenario de mandos */
+  .stage {
+    position: relative; 
+    height: calc(100vh - 60px); 
+    height: calc(100dvh - 60px);
+    display: grid; grid-template-columns: 1fr 1fr;
+    z-index: 2;
+  }
+
+  .zona {
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .etiqueta {
+    position: absolute; top: 15px; 
+    font-size: 12px; font-weight: 900;
+    letter-spacing: 2px; color: #ffb703;
+    background: rgba(0,0,0,0.7);
+    padding: 4px 10px; border-radius: 8px;
+    border: 1px solid rgba(255, 183, 3, 0.4);
+  }
+
+  .lectura {
+    position: absolute; bottom: 15px; 
+    font-size: 12px; font-weight: 700;
+    color: #00f0ff;
+    background: rgba(0,0,0,0.7);
+    padding: 4px 10px; border-radius: 6px;
+    border: 1px solid rgba(0, 240, 255, 0.4);
+  }
+
+  /* Elementos de las Esquinas */
+  .esquina {
+    position: absolute;
+    z-index: 5;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Copa Pistón (Inferior Izquierda) */
+  .esquina-piston {
+    bottom: 10px;
+    left: 10px;
+  }
+
+  /* Rayo McQueen (Inferior Derecha) */
+  .esquina-mcqueen {
+    bottom: 10px;
+    right: 10px;
+  }
+
+  .img-esquina {
+    width: clamp(60px, 12vw, 100px);
+    height: auto;
+    filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.6));
+  }
+
+  .img-mcqueen {
+    filter: drop-shadow(0 0 10px rgba(255, 30, 30, 0.8));
+  }
+</style>
+</head>
+<body>
+
+<div class="fondo-toretto"></div>
+
+<div class="texto-tuve-fe">
+  <span class="subtexto-toretto">NO TENGO AMIGOS, TENGO FAMILIA</span>
+  YO TUVE FE
+</div>
+
+<div class="barra">
+  <div class="titulo">🏎️ ESPolero <span style="font-size:9px; color:#ff1e1e; border:1px solid #ff1e1e; padding:1px 4px; border-radius:3px;">NITRO</span></div>
+  <div id="estado" class="estado">Desconectado</div>
+  <div class="acciones-barra">
+    <button id="btnConectar">CONECTAR</button>
+    <button id="btnFullscreen" class="btn-fullscreen" title="Pantalla completa">⛶</button>
+  </div>
+</div>
+
+<div class="stage">
+  <div class="zona izq" id="zonaIzq">
+    <div class="etiqueta">VELOCIDAD</div>
+    <div class="lectura" id="lecturaVel">vel: 0</div>
+  </div>
+  <div class="zona der" id="zonaDer">
+    <div class="etiqueta">GIRO</div>
+    <div class="lectura" id="lecturaGiro">giro: 0</div>
+  </div>
+</div>
+
+<!-- Esquina Izquierda: Copa Pistón (Render en SVG transparente) -->
+<div class="esquina esquina-piston">
+  <svg class="img-esquina" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M30 20 H70 V40 C70 55 55 65 50 70 C45 65 30 55 30 40 Z" fill="#FFD700" stroke="#FFA500" stroke-width="3"/>
+    <path d="M20 25 C10 25 10 45 30 45" stroke="#FFD700" stroke-width="4" fill="none"/>
+    <path d="M80 25 C90 25 90 45 70 45" stroke="#FFD700" stroke-width="4" fill="none"/>
+    <rect x="40" y="70" width="20" height="15" fill="#DAA520"/>
+    <rect x="30" y="85" width="40" height="10" fill="#B8860B"/>
+    <text x="50" y="45" font-size="12" font-weight="bold" fill="#000" text-anchor="middle">PISTON</text>
+  </svg>
+</div>
+
+<!-- Esquina Derecha: Rayo McQueen (Render en SVG transparente con el #95) -->
+<div class="esquina esquina-mcqueen">
+  <svg class="img-esquina img-mcqueen" viewBox="0 0 120 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10 45 Q 15 25 35 20 L 75 20 Q 95 22 110 40 L 115 50 Q 115 58 100 58 L 15 58 Q 5 58 10 45 Z" fill="#FF1E1E"/>
+    <path d="M35 23 L 50 23 L 48 35 L 30 35 Z" fill="#88DFFC"/>
+    <path d="M55 23 L 72 23 L 75 35 L 52 35 Z" fill="#88DFFC"/>
+    <path d="M70 38 L 90 38 L 80 50 L 60 50 Z" fill="#FFD700"/>
+    <text x="45" y="52" font-family="'Impact', sans-serif" font-size="18" font-weight="bold" fill="#FFD700" italic>95</text>
+    <circle cx="30" cy="55" r="10" fill="#111" stroke="#444" stroke-width="2"/>
+    <circle cx="90" cy="55" r="10" fill="#111" stroke="#444" stroke-width="2"/>
+  </svg>
+</div>
+
+<script>
+  // ===== Configuración BLE =====
+  const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
+  const CHAR_UUID    = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+
+  let caracteristica = null;
+  let velocidad = 0;   
+  let giro      = 0;   
+
+  const $estado    = document.getElementById('estado');
+  const $btn       = document.getElementById('btnConectar');
+  const $btnFS     = document.getElementById('btnFullscreen');
+  const $lectVel   = document.getElementById('lecturaVel');
+  const $lectGiro  = document.getElementById('lecturaGiro');
+
+  // ===== Pantalla Completa =====
+  $btnFS.addEventListener('click', () => {
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+      const elem = document.documentElement;
+      if (elem.requestFullscreen) {
+        elem.requestFullscreen();
+      } else if (elem.webkitRequestFullscreen) {
+        elem.webkitRequestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
+    }
+  });
+
+  // ===== Joysticks con estilo Neón =====
+  const opciones = {
+    mode: 'static',
+    position: { left: '50%', top: '50%' },
+    color: '#ff1e1e',
+    size: 150,
+    restOpacity: 0.8,
+  };
+
+  const joyIzq = nipplejs.create({ zone: document.getElementById('zonaIzq'), ...opciones });
+  const joyDer = nipplejs.create({ zone: document.getElementById('zonaDer'), ...opciones });
+
+  joyIzq.on('move', (evt, data) => {
+    velocidad = Math.round(data.vector.y * 100);
+    $lectVel.textContent = 'vel: ' + velocidad;
+  });
+  joyIzq.on('end', () => {
+    velocidad = 0;
+    $lectVel.textContent = 'vel: 0';
+  });
+
+  joyDer.on('move', (evt, data) => {
+    giro = Math.round(data.vector.x * 100);
+    $lectGiro.textContent = 'giro: ' + giro;
+  });
+  joyDer.on('end', () => {
+    giro = 0;
+    $lectGiro.textContent = 'giro: 0';
+  });
+
+  // ===== Conexión BLE =====
+  $btn.addEventListener('click', async () => {
+    if (!navigator.bluetooth) {
+      alert('Este navegador no soporta Web Bluetooth. Usa Chrome en Android.');
+      return;
+    }
+    try {
+      $estado.textContent = 'Buscando...';
+      $estado.className = 'estado';
+
+      const device = await navigator.bluetooth.requestDevice({
+        filters: [{ namePrefix: 'ESPolero' }],
+        optionalServices: [SERVICE_UUID],
+      });
+
+      device.addEventListener('gattserverdisconnected', () => {
+        $estado.textContent = 'Desconectado';
+        $estado.className = 'estado err';
+        caracteristica = null;
+      });
+
+      const server  = await device.gatt.connect();
+      const service = await server.getPrimaryService(SERVICE_UUID);
+      caracteristica = await service.getCharacteristic(CHAR_UUID);
+
+      $estado.textContent = 'Conectado: ' + device.name;
+      $estado.className = 'estado ok';
+    } catch (err) {
+      console.error(err);
+      $estado.textContent = 'Error: ' + err.message;
+      $estado.className = 'estado err';
+    }
+  });
+
+  // ===== Envío de datos (20 Hz) =====
+  setInterval(async () => {
+    if (!caracteristica) return;
+    try {
+      const buf = new Int8Array([velocidad, giro]);
+      await caracteristica.writeValueWithoutResponse(buf);
+    } catch (err) {
+      // Manejo silencioso de pequeños dropouts
+    }
+  }, 50);
+</script>
+</body>
+</html>
